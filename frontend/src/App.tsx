@@ -11,6 +11,7 @@ import CartModal from './components/CartModal'
 import CatalogPanel from './components/CatalogPanel'
 import CheckoutPage from './components/CheckoutPage'
 import OrderConfirmationPage from './components/OrderConfirmationPage'
+import { StoreLogoIcon, CartIcon, SparklesIcon } from './components/Icons'
 import type { Cart, Order, Product } from './types'
 import './App.css'
 
@@ -35,6 +36,8 @@ function App() {
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<Cart>({ sessionId, items: [], updatedAt: '' })
   const [selectedCategory, setSelectedCategory] = useState('All')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState('featured')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isCheckingOut, setIsCheckingOut] = useState(false)
@@ -52,13 +55,37 @@ function App() {
     return ['All', ...new Set(products.map((product) => product.category))]
   }, [products])
 
+  const totalCartCount = useMemo(() => {
+    return cart.items.reduce((sum, item) => sum + item.qty, 0)
+  }, [cart.items])
+
   const visibleProducts = useMemo(() => {
-    if (selectedCategory === 'All') {
-      return products
+    let list = [...products]
+
+    if (selectedCategory !== 'All') {
+      list = list.filter((product) => product.category === selectedCategory)
     }
 
-    return products.filter((product) => product.category === selectedCategory)
-  }, [products, selectedCategory])
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim()
+      list = list.filter(
+        (product) =>
+          product.name.toLowerCase().includes(query) ||
+          product.description.toLowerCase().includes(query) ||
+          product.category.toLowerCase().includes(query),
+      )
+    }
+
+    if (sortBy === 'price-low') {
+      list.sort((a, b) => a.price - b.price)
+    } else if (sortBy === 'price-high') {
+      list.sort((a, b) => b.price - a.price)
+    } else if (sortBy === 'name') {
+      list.sort((a, b) => a.name.localeCompare(b.name))
+    }
+
+    return list
+  }, [products, selectedCategory, searchQuery, sortBy])
 
   const cartTotal = useMemo(() => {
     return cart.items.reduce((sum, item) => sum + item.price * item.qty, 0)
@@ -187,23 +214,53 @@ function App() {
       ? ((location.state as { order?: Order }).order ?? confirmedOrder)
       : confirmedOrder
 
+  const isHomePage = location.pathname === '/'
+
   return (
     <div className="app-shell">
-      <header className="hero-banner">
-        <div>
-          <p className="eyebrow">Portfolio Project · React + AWS</p>
-          <h1>Northstar Outfitters</h1>
-          <p className="hero-copy">
-            A demo ecommerce storefront with a serverless backend on API Gateway,
-            Lambda, and DynamoDB.
-          </p>
-        </div>
-        <div className="hero-actions">
-          <button type="button" className="cart-trigger" onClick={() => setIsCartOpen(true)}>
-            Cart ({cart.items.reduce((sum, item) => sum + item.qty, 0)})
+      {/* Top Navbar */}
+      <header className="store-navbar">
+        <div className="navbar-container">
+          <button type="button" className="nav-brand" onClick={handleBackToCatalog}>
+            <div className="logo-icon-wrap">
+              <StoreLogoIcon size={24} />
+            </div>
+            <div className="brand-text">
+              <span className="brand-name">Northstar Outfitters</span>
+              <span className="brand-tagline">Premium Outdoor & Travel Gear</span>
+            </div>
           </button>
+
+          <div className="nav-actions">
+            <button
+              type="button"
+              className="cart-trigger"
+              onClick={() => setIsCartOpen(true)}
+              aria-label="View Cart"
+            >
+              <CartIcon size={20} />
+              <span className="cart-text">Cart</span>
+              {totalCartCount > 0 && <span className="cart-badge">{totalCartCount}</span>}
+            </button>
+          </div>
         </div>
       </header>
+
+      {/* Hero Banner (Shown on Catalog Home) */}
+      {isHomePage && (
+        <section className="hero-banner">
+          <div className="hero-content">
+            <div className="eyebrow-badge">
+              <SparklesIcon size={14} />
+              <span>AWS Serverless E-Commerce Demo</span>
+            </div>
+            <h1 className="hero-title">Equip Your Next Adventure</h1>
+            <p className="hero-copy">
+              Explore professional-grade outdoor apparel, technical footwear, and field gear built for performance. Powered by AWS Lambda & DynamoDB.
+            </p>
+          </div>
+        </section>
+      )}
 
       {error && <p className="error-banner">{error}</p>}
 
@@ -215,6 +272,10 @@ function App() {
               <CatalogPanel
                 categories={categories}
                 selectedCategory={selectedCategory}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                sortBy={sortBy}
+                onSortChange={setSortBy}
                 isLoading={isLoading}
                 visibleProducts={visibleProducts}
                 onSelectCategory={setSelectedCategory}
@@ -255,8 +316,19 @@ function App() {
         onGoToCheckout={handleGoToCheckout}
       />
 
-      <footer className="footnote">
-        <p>Session: {sessionId}</p>
+      <footer className="store-footer">
+        <div className="footer-content">
+          <div className="footer-brand">
+            <div className="logo-icon-wrap small">
+              <StoreLogoIcon size={18} />
+            </div>
+            <strong>Northstar Outfitters</strong>
+          </div>
+          <div className="footer-meta">
+            <p>AWS Portfolio Project · Built with React, Vite, Sharp & Serverless Backend</p>
+            <p className="session-tag">Active Session: <code>{sessionId}</code></p>
+          </div>
+        </div>
       </footer>
     </div>
   )
